@@ -1,0 +1,122 @@
+---
+title: "Practical Learning Machine Project"
+author: "Carlos Cortes Franco"
+date: "Sunday, June 21, 2015"
+output: html_document
+---
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+## Data 
+
+The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+
+## Loading the data
+
+```{r Block1}
+#{r Block1, cache = TRUE}
+setwd("C:/GitHub/PLM")
+url <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+dfile <- "C:/GitHub/PLM/pml-training.csv"
+if(!file.exists(dfile)) {
+        download.file(url, dfile)
+}
+train_raw <- read.csv(dfile,na.strings=c("NA","","#DIV/0!"))
+url <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+dfile <- "C:/GitHub/PLM/pml-testing.csv"
+if(!file.exists(dfile)) {
+        download.file(url, dfile)
+}
+test_raw <- read.csv(dfile,na.strings=c("NA","","#DIV/0!"))
+```
+
+## Cleaning the datasets
+```{r Block2}
+
+# Removing columns with NA
+train_clean <- train_raw[!sapply(train_raw,function(z)any(is.na(z)))]
+test_clean  <- test_raw[!sapply(test_raw,function(z)any(is.na(z)))]
+
+# Eliminating non important columns
+train_total <- train_clean[,-c(1:7)]
+test_total  <- test_clean[,-c(1:7)]
+```
+
+## Data analysis
+```{r Block3}
+
+# Check Classe Frequency distribution 
+plot(train_total$classe, col="blue", main="Clasee Values Distribution", xlab="Classe", ylab="Frequency")
+table(train_total$classe)
+```
+
+## Partition the training dataset
+```{r Block4}
+
+library(caret)
+# Partition the training dataset
+inTrain <- createDataPartition(y=train_total$classe, p=0.7, list=FALSE)
+train <- train_total[inTrain,]
+test  <- train_total[-inTrain,]
+```
+
+## Model training for lda and random forest
+```{r Block5, cache = TRUE}
+
+modFit_lda <- train(classe ~. , data=train, method="lda")
+library(randomForest)
+modFit_rf  <- randomForest(classe ~. , data=train, method="class")
+
+```
+
+## Comparing accuracies of both methods
+```{r Block6}
+
+predict_lda <- predict(modFit_lda, test)
+print(confusionMatrix(predict_lda, test$classe))
+
+predict_rf <- predict(modFit_rf, test)
+print(confusionMatrix(predict_rf, test$classe))
+```
+
+## Showing the most important variables
+```{r Block7}
+
+varImp <- varImp(modFit_rf)
+varImp_rnames <- rownames(varImp) 
+vars <- order(varImp, decreasing = TRUE)
+vI <- data.frame(variable = varImp_rnames[vars], importance = varImp[vars,])
+head(vI)
+```
+
+## Predicting for the test dataset with the best method
+```{r Block8}
+
+#predict(modFit_lda, newdata=test_total)
+predict(modFit_rf,  newdata=test_total)
+
+```
+
+## Writing the answer files
+```{r Block9}
+
+answers <- as.vector(predict(modFit_rf,  newdata=test_total))
+
+pml_write_files = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, 
+            col.names = FALSE)
+    }
+}
+
+pml_write_files(answers)
+
+```
+
